@@ -2,7 +2,7 @@
 
 > 将中国历代科举状元（隋朝 605 年 → 清朝 1904 年）的籍贯按现代省份汇总，在交互式地图上直观呈现。
 
-🔗 **在线预览**：[https://sanmingmrx.github.io/ZhuangyuanRank/](https://sanmingmrx.github.io/ZhuangyuanRank/)
+🔗 **在线预览**：[https://suntory9.github.io/ZhuangyuanRank/](https://suntory9.github.io/ZhuangyuanRank/)
 
 ---
 
