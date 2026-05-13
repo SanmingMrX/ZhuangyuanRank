@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>历代状元籍贯分布</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: #f5f0e8;
+      color: #2c1a0e;
+      min-height: 100vh;
+    }
+
+    #header {
+      background: linear-gradient(135deg, #7b1e1e 0%, #c0392b 100%);
+      color: #fff;
+      padding: 14px 28px;
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      flex-wrap: wrap;
+    }
+
+    #header h1 { font-size: 20px; font-weight: 700; letter-spacing: 2px; }
+    #header-stats { font-size: 13px; opacity: 0.85; }
+    #header-note { font-size: 11px; opacity: 0.6; margin-left: auto; }
+
+    #main { display: flex; height: calc(100vh - 52px); }
+
+    /* ── 地图 ── */
+    #map-container { flex: 1 1 60%; min-width: 0; }
+    #map { width: 100%; height: 100%; }
+
+    /* ── 侧边栏 ── */
+    #sidebar {
+      flex: 0 0 360px;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      border-left: 1px solid #ddd;
+      overflow: hidden;
+    }
+
+    #filter-panel {
+      padding: 12px 14px 10px;
+      background: #fdf8f2;
+      border-bottom: 1px solid #e8ddd0;
+    }
+
+    #filter-panel h3 {
+      font-size: 11px;
+      color: #7b5a3a;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    #dynasty-filter { display: flex; flex-wrap: wrap; gap: 5px; }
+
+    .dynasty-btn {
+      padding: 3px 9px;
+      border-radius: 12px;
+      border: 1.5px solid #c0392b;
+      background: transparent;
+      color: #c0392b;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+
+    .dynasty-btn.active { background: #c0392b; color: #fff; }
+    .dynasty-btn:hover:not(.active) { background: #f9e8e5; }
+
+    #filter-actions { margin-top: 7px; display: flex; gap: 7px; }
+
+    .action-btn {
+      padding: 2px 9px;
+      border: 1px solid #bbb;
+      background: #fff;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      color: #555;
+      font-family: inherit;
+    }
+    .action-btn:hover { background: #f0f0f0; }
+
+    /* ── 排行榜 ── */
+    #ranking-panel { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+    #ranking-header {
+      padding: 8px 14px 6px;
+      font-size: 11px;
+      color: #7b5a3a;
+      letter-spacing: 1px;
+      border-bottom: 1px solid #eee;
+      background: #fdf8f2;
+      text-transform: uppercase;
+    }
+
+    #ranking-list { flex: 1; overflow-y: auto; }
+    #ranking-list::-webkit-scrollbar { width: 4px; }
+    #ranking-list::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+
+    .rank-row {
+      display: grid;
+      grid-template-columns: 34px 1fr 48px 64px;
+      align-items: center;
+      padding: 7px 14px;
+      border-bottom: 1px solid #f0ebe5;
+      cursor: pointer;
+      transition: background 0.1s;
+      user-select: none;
+    }
+
+    .rank-row:hover { background: #fef8f4; }
+    .rank-row.selected { background: #fde8e5; border-left: 3px solid #c0392b; padding-left: 11px; }
+
+    .rank-num { font-size: 13px; font-weight: 700; color: #ccc; }
+    .rank-row:nth-child(-n+3) .rank-num { color: #c0392b; }
+    .rank-province { font-size: 14px; font-weight: 500; }
+    .rank-count { font-size: 14px; font-weight: 700; color: #c0392b; text-align: right; }
+    .rank-top-dynasty { font-size: 11px; color: #999; text-align: right; padding-left: 4px; }
+
+    .rank-detail {
+      display: none;
+      padding: 8px 14px 12px;
+      background: #fef8f4;
+      border-bottom: 1px solid #f0ebe5;
+    }
+    .rank-detail.open { display: block; }
+
+    .rank-detail-title { font-size: 11px; color: #7b5a3a; margin-bottom: 6px; }
+
+    .dynasty-section { margin-bottom: 6px; }
+    .dynasty-label {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 3px;
+      font-weight: 500;
+    }
+
+    .person-list { display: flex; flex-wrap: wrap; gap: 3px; }
+    .person-tag {
+      font-size: 12px;
+      background: #fff;
+      border: 1px solid #e8ddd0;
+      border-radius: 3px;
+      padding: 2px 6px;
+      color: #333;
+    }
+    .person-tag.uncertain { opacity: 0.6; border-style: dashed; }
+    .person-tag span { font-size: 10px; color: #aaa; margin-left: 2px; }
+
+    #empty-state { display: none; padding: 40px 16px; text-align: center; color: #bbb; font-size: 14px; }
+
+    @media (max-width: 768px) {
+      #main { flex-direction: column; height: auto; }
+      #map-container { height: 55vw; min-height: 260px; }
+      #sidebar { flex: none; max-height: 50vh; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>历代状元籍贯分布</h1>
+  <div id="header-stats">共 <b id="stat-total">0</b> 位状元，覆盖 <b id="stat-provinces">0</b> 个省份</div>
+  <div id="header-note">科举状元：隋（605年）→ 清（1904年）| 数据含存疑记录（虚线标注）</div>
+</div>
+
+<div id="main">
+  <div id="map-container"><div id="map"></div></div>
+
+  <div id="sidebar">
+    <div id="filter-panel">
+      <h3>朝代筛选</h3>
+      <div id="dynasty-filter"></div>
+      <div id="filter-actions">
+        <button class="action-btn" onclick="selectAll()">全选</button>
+        <button class="action-btn" onclick="clearAll()">清空</button>
+      </div>
+    </div>
+    <div id="ranking-panel">
+      <div id="ranking-header">省份排行（点击展开状元列表）</div>
+      <div id="ranking-list"></div>
+      <div id="empty-state">暂无数据，请选择至少一个朝代</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<script>
+// ─────────────────────────────────────────
+//  原始状元数据（来源：《登科记考》《历代状元传》《明清历科进士题名碑录》等）
+//  uncertain:true 表示籍贯或身份存在史料争议
+// ─────────────────────────────────────────
+const _RAW = [
+  // ── 隋 ──
+  { name:"孙伏伽", dynasty:"隋", year:605, province:"河北", uncertain:true },
+
+  // ── 唐 ──
+  { name:"孙伏伽",   dynasty:"唐", year:622, province:"河北" },
+  { name:"侯君素",   dynasty:"唐", year:623, province:"河南", uncertain:true },
+  { name:"郭元振",   dynasty:"唐", year:670, province:"河北" },
+  { name:"员半千",   dynasty:"唐", year:672, province:"山西" },
+  { name:"贺知章",   dynasty:"唐", year:695, province:"浙江" },
+  { name:"王翰",     dynasty:"唐", year:710, province:"山西" },
+  { name:"席豫",     dynasty:"唐", year:710, province:"陕西" },
+  { name:"王维",     dynasty:"唐", year:721, province:"山西" },
+  { name:"苗晋卿",   dynasty:"唐", year:723, province:"山西" },
+  { name:"李昂",     dynasty:"唐", year:724, province:"陕西", uncertain:true },
+  { name:"祖咏",     dynasty:"唐", year:724, province:"河南" },
+  { name:"储光羲",   dynasty:"唐", year:726, province:"江苏" },
+  { name:"王昌龄",   dynasty:"唐", year:727, province:"山西", uncertain:true },
+  { name:"崔曙",     dynasty:"唐", year:729, province:"河南" },
+  { name:"卢象",     dynasty:"唐", year:729, province:"河南" },
+  { name:"刘晏",     dynasty:"唐", year:730, province:"山东" },
+  { name:"萧颖士",   dynasty:"唐", year:735, province:"安徽" },
+  { name:"李华",     dynasty:"唐", year:735, province:"河北" },
+  { name:"颜真卿",   dynasty:"唐", year:734, province:"陕西" },
+  { name:"刘长卿",   dynasty:"唐", year:733, province:"安徽", uncertain:true },
+  { name:"杜鸿渐",   dynasty:"唐", year:740, province:"河南" },
+  { name:"李嶷",     dynasty:"唐", year:741, province:"陕西" },
+  { name:"李揆",     dynasty:"唐", year:741, province:"陕西" },
+  { name:"严武",     dynasty:"唐", year:751, province:"陕西" },
+  { name:"张继",     dynasty:"唐", year:753, province:"湖北", uncertain:true },
+  { name:"元结",     dynasty:"唐", year:754, province:"河南" },
+  { name:"独孤及",   dynasty:"唐", year:754, province:"河南" },
+  { name:"杨炎",     dynasty:"唐", year:756, province:"陕西" },
+  { name:"鲁收",     dynasty:"唐", year:756, province:"山西" },
+  { name:"常衮",     dynasty:"唐", year:757, province:"陕西" },
+  { name:"梁肃",     dynasty:"唐", year:773, province:"河南" },
+  { name:"权德舆",   dynasty:"唐", year:779, province:"陕西" },
+  { name:"崔元翰",   dynasty:"唐", year:786, province:"河南" },
+  { name:"张正元",   dynasty:"唐", year:797, province:"河南" },
+  { name:"李程",     dynasty:"唐", year:798, province:"陕西" },
+  { name:"白居易",   dynasty:"唐", year:800, province:"陕西" },
+  { name:"沈传师",   dynasty:"唐", year:800, province:"浙江" },
+  { name:"裴度",     dynasty:"唐", year:793, province:"陕西" },
+  { name:"吕温",     dynasty:"唐", year:796, province:"河南" },
+  { name:"韩愈",     dynasty:"唐", year:792, province:"河南" },
+  { name:"欧阳詹",   dynasty:"唐", year:792, province:"福建" },
+  { name:"王涯",     dynasty:"唐", year:793, province:"山西" },
+  { name:"冯宿",     dynasty:"唐", year:793, province:"浙江" },
+  { name:"刘禹锡",   dynasty:"唐", year:793, province:"河南" },
+  { name:"柳宗元",   dynasty:"唐", year:793, province:"山西" },
+  { name:"崔群",     dynasty:"唐", year:796, province:"山东" },
+  { name:"王起",     dynasty:"唐", year:796, province:"山东" },
+  { name:"李绅",     dynasty:"唐", year:796, province:"江苏" },
+  { name:"令狐楚",   dynasty:"唐", year:793, province:"山西" },
+  { name:"张又新",   dynasty:"唐", year:809, province:"陕西" },
+  { name:"牛僧孺",   dynasty:"唐", year:808, province:"陕西" },
+  { name:"柳公权",   dynasty:"唐", year:808, province:"陕西" },
+  { name:"元稹",     dynasty:"唐", year:809, province:"河南" },
+  { name:"章孝标",   dynasty:"唐", year:810, province:"浙江" },
+  { name:"裴休",     dynasty:"唐", year:825, province:"河南" },
+  { name:"归仁绍",   dynasty:"唐", year:824, province:"江苏" },
+  { name:"韦瓘",     dynasty:"唐", year:836, province:"陕西" },
+  { name:"杜牧",     dynasty:"唐", year:828, province:"陕西" },
+  { name:"李商隐",   dynasty:"唐", year:838, province:"河南", uncertain:true },
+  { name:"卢肇",     dynasty:"唐", year:836, province:"江西" },
+  { name:"许浑",     dynasty:"唐", year:832, province:"江苏" },
+  { name:"赵嘏",     dynasty:"唐", year:840, province:"江苏" },
+  { name:"马戴",     dynasty:"唐", year:840, province:"山西" },
+  { name:"温庭筠",   dynasty:"唐", year:848, province:"山西", uncertain:true },
+  { name:"李频",     dynasty:"唐", year:851, province:"浙江" },
+  { name:"崔铉",     dynasty:"唐", year:837, province:"山东" },
+  { name:"郑颢",     dynasty:"唐", year:842, province:"河南" },
+  { name:"崔慎由",   dynasty:"唐", year:837, province:"山东" },
+  { name:"封敖",     dynasty:"唐", year:825, province:"陕西" },
+  { name:"裴坦",     dynasty:"唐", year:848, province:"陕西" },
+  { name:"司空图",   dynasty:"唐", year:862, province:"陕西" },
+  { name:"卢携",     dynasty:"唐", year:855, province:"河南" },
+  { name:"崔安潜",   dynasty:"唐", year:854, province:"山东" },
+  { name:"崔瀣",     dynasty:"唐", year:855, province:"山东" },
+  { name:"崔昭纬",   dynasty:"唐", year:859, province:"山东" },
+  { name:"路岩",     dynasty:"唐", year:850, province:"山西" },
+  { name:"张读",     dynasty:"唐", year:850, province:"山东" },
+  { name:"归仁泽",   dynasty:"唐", year:860, province:"江苏" },
+  { name:"孔纁",     dynasty:"唐", year:866, province:"山东" },
+  { name:"崔渊",     dynasty:"唐", year:866, province:"山东" },
+  { name:"崔砺",     dynasty:"唐", year:896, province:"山东" },
+  { name:"崔昭",     dynasty:"唐", year:900, province:"山东" },
+  { name:"崔沆",     dynasty:"唐", year:871, province:"山东" },
+  { name:"黄颇",     dynasty:"唐", year:876, province:"江西" },
+  { name:"归黯",     dynasty:"唐", year:877, province:"江苏" },
+  { name:"崔澹",     dynasty:"唐", year:878, province:"山东" },
+  { name:"孙偓",     dynasty:"唐", year:880, province:"山东" },
+  { name:"卢汝弼",   dynasty:"唐", year:864, province:"河南" },
+  { name:"翁彦枢",   dynasty:"唐", year:895, province:"福建" },
+  { name:"钟辐",     dynasty:"唐", year:895, province:"江西" },
+  { name:"卢延让",   dynasty:"唐", year:893, province:"山西" },
+  { name:"韦庄",     dynasty:"唐", year:894, province:"陕西" },
+  { name:"郑谷",     dynasty:"唐", year:880, province:"江西" },
+  { name:"罗隐",     dynasty:"唐", year:870, province:"浙江", uncertain:true },
+  { name:"柳玭",     dynasty:"唐", year:880, province:"陕西" },
+  { name:"陈乂",     dynasty:"唐", year:885, province:"福建" },
+  { name:"孙祁",     dynasty:"唐", year:902, province:"山东" },
+  { name:"赵观文",   dynasty:"唐", year:899, province:"广东" },
+  { name:"裴格",     dynasty:"唐", year:886, province:"陕西" },
+  { name:"归系",     dynasty:"唐", year:899, province:"江苏" },
+  { name:"卢文焕",   dynasty:"唐", year:894, province:"河南" },
+  { name:"韩渥",     dynasty:"唐", year:890, province:"河南" },
+  { name:"曹松",     dynasty:"唐", year:901, province:"安徽" },
+  { name:"柯崇",     dynasty:"唐", year:901, province:"福建" },
+  { name:"裴延翰",   dynasty:"唐", year:904, province:"山西" },
+
+  // ── 五代十国 ──
+  { name:"冯道",     dynasty:"五代十国", year:916, province:"河北", uncertain:true },
+  { name:"和凝",     dynasty:"五代十国", year:920, province:"山东" },
+  { name:"崔棁",     dynasty:"五代十国", year:928, province:"山东" },
+  { name:"王仁裕",   dynasty:"五代十国", year:924, province:"甘肃", uncertain:true },
+  { name:"桑维翰",   dynasty:"五代十国", year:930, province:"河南" },
+  { name:"窦仪",     dynasty:"五代十国", year:937, province:"河北" },
+  { name:"徐铉",     dynasty:"五代十国", year:940, province:"江苏", uncertain:true },
+  { name:"李昉",     dynasty:"五代十国", year:947, province:"河北" },
+  { name:"王溥",     dynasty:"五代十国", year:954, province:"山西" },
+  { name:"扈蒙",     dynasty:"五代十国", year:956, province:"山东" },
+  { name:"卢多逊",   dynasty:"五代十国", year:958, province:"河南" },
+
+  // ── 北宋 ──
+  { name:"王嗣宗",   dynasty:"北宋", year:976, province:"山西" },
+  { name:"吕蒙正",   dynasty:"北宋", year:977, province:"河南" },
+  { name:"李沆",     dynasty:"北宋", year:977, province:"河北" },
+  { name:"宋湜",     dynasty:"北宋", year:979, province:"山东" },
+  { name:"胡旦",     dynasty:"北宋", year:978, province:"山东" },
+  { name:"梁灏",     dynasty:"北宋", year:980, province:"山东" },
+  { name:"陈充",     dynasty:"北宋", year:985, province:"四川" },
+  { name:"苏易简",   dynasty:"北宋", year:988, province:"四川" },
+  { name:"陈尧叟",   dynasty:"北宋", year:988, province:"四川" },
+  { name:"孙何",     dynasty:"北宋", year:995, province:"河南" },
+  { name:"姜盖",     dynasty:"北宋", year:997, province:"河南" },
+  { name:"李迪",     dynasty:"北宋", year:1000, province:"山东" },
+  { name:"王曾",     dynasty:"北宋", year:1000, province:"山东" },
+  { name:"陈尧咨",   dynasty:"北宋", year:1000, province:"四川" },
+  { name:"张观",     dynasty:"北宋", year:1002, province:"河南" },
+  { name:"蔡齐",     dynasty:"北宋", year:1015, province:"山东" },
+  { name:"韩国华",   dynasty:"北宋", year:979, province:"陕西" },
+  { name:"宋庠",     dynasty:"北宋", year:1024, province:"安徽" },
+  { name:"王尧臣",   dynasty:"北宋", year:1025, province:"湖北" },
+  { name:"张唐英",   dynasty:"北宋", year:1049, province:"四川" },
+  { name:"冯京",     dynasty:"北宋", year:1051, province:"湖北" },
+  { name:"章衡",     dynasty:"北宋", year:1057, province:"福建" },
+  { name:"贾黯",     dynasty:"北宋", year:1034, province:"河南" },
+  { name:"许将",     dynasty:"北宋", year:1063, province:"福建" },
+  { name:"郑獬",     dynasty:"北宋", year:1063, province:"湖北" },
+  { name:"彭汝砺",   dynasty:"北宋", year:1067, province:"江西" },
+  { name:"余中",     dynasty:"北宋", year:1073, province:"浙江" },
+  { name:"叶祖洽",   dynasty:"北宋", year:1073, province:"福建" },
+  { name:"徐铎",     dynasty:"北宋", year:1077, province:"福建" },
+  { name:"黄裳",     dynasty:"北宋", year:1082, province:"福建" },
+  { name:"时彦",     dynasty:"北宋", year:1088, province:"河南" },
+  { name:"焦蹈",     dynasty:"北宋", year:1091, province:"河南" },
+  { name:"毕渐",     dynasty:"北宋", year:1097, province:"湖北" },
+  { name:"何昌言",   dynasty:"北宋", year:1100, province:"福建" },
+  { name:"霍端友",   dynasty:"北宋", year:1103, province:"安徽" },
+  { name:"蔡薿",     dynasty:"北宋", year:1106, province:"福建" },
+  { name:"王昂",     dynasty:"北宋", year:1109, province:"福建" },
+  { name:"莫俦",     dynasty:"北宋", year:1112, province:"浙江" },
+  { name:"沈晦",     dynasty:"北宋", year:1121, province:"浙江" },
+  { name:"王悦",     dynasty:"北宋", year:1115, province:"河南" },
+
+  // ── 南宋 ──
+  { name:"张九成",   dynasty:"南宋", year:1132, province:"浙江" },
+  { name:"刘才邵",   dynasty:"南宋", year:1135, province:"浙江" },
+  { name:"汪应辰",   dynasty:"南宋", year:1138, province:"江西" },
+  { name:"黄公度",   dynasty:"南宋", year:1148, province:"福建" },
+  { name:"张孝祥",   dynasty:"南宋", year:1151, province:"安徽" },
+  { name:"王十朋",   dynasty:"南宋", year:1151, province:"浙江" },
+  { name:"施师点",   dynasty:"南宋", year:1151, province:"浙江" },
+  { name:"梁克家",   dynasty:"南宋", year:1157, province:"福建" },
+  { name:"萧国梁",   dynasty:"南宋", year:1160, province:"福建" },
+  { name:"郑侨",     dynasty:"南宋", year:1162, province:"福建" },
+  { name:"木待问",   dynasty:"南宋", year:1166, province:"浙江" },
+  { name:"赵汝愚",   dynasty:"南宋", year:1168, province:"浙江" },
+  { name:"郑汝谐",   dynasty:"南宋", year:1169, province:"浙江" },
+  { name:"詹骙",     dynasty:"南宋", year:1172, province:"福建" },
+  { name:"黄定",     dynasty:"南宋", year:1175, province:"福建" },
+  { name:"姚颖",     dynasty:"南宋", year:1178, province:"浙江" },
+  { name:"曾逮",     dynasty:"南宋", year:1181, province:"江西" },
+  { name:"黄由",     dynasty:"南宋", year:1184, province:"浙江" },
+  { name:"余复",     dynasty:"南宋", year:1187, province:"福建" },
+  { name:"卫泾",     dynasty:"南宋", year:1187, province:"江苏" },
+  { name:"陈亮",     dynasty:"南宋", year:1193, province:"浙江" },
+  { name:"邹应龙",   dynasty:"南宋", year:1196, province:"福建" },
+  { name:"任希夷",   dynasty:"南宋", year:1196, province:"四川" },
+  { name:"毛自知",   dynasty:"南宋", year:1199, province:"浙江" },
+  { name:"郑性之",   dynasty:"南宋", year:1205, province:"福建" },
+  { name:"郑乔年",   dynasty:"南宋", year:1202, province:"福建" },
+  { name:"蒋重珍",   dynasty:"南宋", year:1211, province:"江苏" },
+  { name:"吴潜",     dynasty:"南宋", year:1208, province:"安徽" },
+  { name:"袁甫",     dynasty:"南宋", year:1208, province:"浙江" },
+  { name:"阳枋",     dynasty:"南宋", year:1220, province:"四川" },
+  { name:"吴叔告",   dynasty:"南宋", year:1223, province:"福建" },
+  { name:"李道传",   dynasty:"南宋", year:1223, province:"四川" },
+  { name:"刘渭",     dynasty:"南宋", year:1214, province:"福建" },
+  { name:"赵建大",   dynasty:"南宋", year:1217, province:"浙江" },
+  { name:"徐元杰",   dynasty:"南宋", year:1229, province:"江西" },
+  { name:"周坦",     dynasty:"南宋", year:1232, province:"安徽" },
+  { name:"吴潜",     dynasty:"南宋", year:1235, province:"安徽" },
+  { name:"留梦炎",   dynasty:"南宋", year:1241, province:"浙江" },
+  { name:"徐俨夫",   dynasty:"南宋", year:1244, province:"福建" },
+  { name:"姚勉",     dynasty:"南宋", year:1247, province:"江西" },
+  { name:"方山京",   dynasty:"南宋", year:1247, province:"浙江" },
+  { name:"吴必大",   dynasty:"南宋", year:1250, province:"江西" },
+  { name:"周震炎",   dynasty:"南宋", year:1253, province:"湖南" },
+  { name:"方逢辰",   dynasty:"南宋", year:1253, province:"浙江" },
+  { name:"文天祥",   dynasty:"南宋", year:1256, province:"江西" },
+  { name:"蒋元龙",   dynasty:"南宋", year:1256, province:"浙江" },
+  { name:"马廷鸾",   dynasty:"南宋", year:1254, province:"安徽" },
+  { name:"汪立信",   dynasty:"南宋", year:1259, province:"安徽" },
+  { name:"陈文龙",   dynasty:"南宋", year:1268, province:"福建" },
+  { name:"陈仁玉",   dynasty:"南宋", year:1268, province:"浙江" },
+  { name:"张镇孙",   dynasty:"南宋", year:1271, province:"广东" },
+  { name:"俞国宝",   dynasty:"南宋", year:1274, province:"浙江" },
+  { name:"刘鼎孙",   dynasty:"南宋", year:1274, province:"浙江" },
+
+  // ── 辽 ──
+  { name:"吕德懋",   dynasty:"辽", year:983,  province:"河北", uncertain:true },
+  { name:"张干",     dynasty:"辽", year:986,  province:"河北", uncertain:true },
+  { name:"刘二玄",   dynasty:"辽", year:993,  province:"河北", uncertain:true },
+  { name:"王熙",     dynasty:"辽", year:999,  province:"不详", uncertain:true },
+  { name:"张毂",     dynasty:"辽", year:1006, province:"河北", uncertain:true },
+
+  // ── 金 ──
+  { name:"胡砺",     dynasty:"金", year:1128, province:"河北" },
+  { name:"刘撝",     dynasty:"金", year:1135, province:"河南" },
+  { name:"蔡珪",     dynasty:"金", year:1138, province:"河北" },
+  { name:"张汇",     dynasty:"金", year:1148, province:"河北" },
+  { name:"孟宗献",   dynasty:"金", year:1151, province:"河南" },
+  { name:"徒单恭",   dynasty:"金", year:1154, province:"不详" },
+  { name:"张行信",   dynasty:"金", year:1160, province:"河南" },
+  { name:"移剌慥",   dynasty:"金", year:1163, province:"不详" },
+  { name:"粘合南合", dynasty:"金", year:1166, province:"不详" },
+  { name:"张端",     dynasty:"金", year:1169, province:"河南" },
+  { name:"刘仲渊",   dynasty:"金", year:1172, province:"山东" },
+  { name:"李邦直",   dynasty:"金", year:1175, province:"山东" },
+  { name:"赵永吉",   dynasty:"金", year:1178, province:"河南" },
+  { name:"王彦昂",   dynasty:"金", year:1181, province:"山西" },
+  { name:"杨建安",   dynasty:"金", year:1184, province:"山东" },
+  { name:"张行信",   dynasty:"金", year:1187, province:"河北" },
+  { name:"完颜匡",   dynasty:"金", year:1190, province:"不详" },
+  { name:"赵讽",     dynasty:"金", year:1193, province:"河南" },
+  { name:"刘炳",     dynasty:"金", year:1196, province:"山东" },
+  { name:"任熊祥",   dynasty:"金", year:1199, province:"山西" },
+  { name:"冯延登",   dynasty:"金", year:1202, province:"山东" },
+  { name:"王若虚",   dynasty:"金", year:1202, province:"河北" },
+  { name:"赵安易",   dynasty:"金", year:1205, province:"河南" },
+  { name:"高守忠",   dynasty:"金", year:1208, province:"山东" },
+  { name:"刘浩",     dynasty:"金", year:1211, province:"山西" },
+  { name:"李思聪",   dynasty:"金", year:1217, province:"山东" },
+  { name:"李演",     dynasty:"金", year:1220, province:"山东" },
+  { name:"张格",     dynasty:"金", year:1223, province:"山东" },
+  { name:"裴满衡",   dynasty:"金", year:1226, province:"不详" },
+
+  // ── 元 ──
+  { name:"张起岩",   dynasty:"元", year:1315, province:"山东" },
+  { name:"泰不华",   dynasty:"元", year:1315, province:"不详" },
+  { name:"霍希贤",   dynasty:"元", year:1318, province:"山西" },
+  { name:"笃列图",   dynasty:"元", year:1318, province:"不详" },
+  { name:"宋本",     dynasty:"元", year:1321, province:"河北" },
+  { name:"阔里吉思", dynasty:"元", year:1321, province:"不详" },
+  { name:"王文烨",   dynasty:"元", year:1324, province:"山东" },
+  { name:"忽都达儿", dynasty:"元", year:1324, province:"不详" },
+  { name:"朵儿只班", dynasty:"元", year:1327, province:"不详" },
+  { name:"普颜不花", dynasty:"元", year:1327, province:"不详" },
+  { name:"买闾",     dynasty:"元", year:1330, province:"不详" },
+  { name:"脱因",     dynasty:"元", year:1333, province:"不详" },
+  { name:"魏元礼",   dynasty:"元", year:1333, province:"不详" },
+  { name:"答禄与权", dynasty:"元", year:1335, province:"不详" },
+  { name:"只儿哈郎", dynasty:"元", year:1335, province:"不详" },
+  { name:"陈祖仁",   dynasty:"元", year:1339, province:"浙江" },
+  { name:"朵烈图",   dynasty:"元", year:1342, province:"不详" },
+  { name:"成遵",     dynasty:"元", year:1345, province:"河南" },
+  { name:"余阙",     dynasty:"元", year:1345, province:"安徽" },
+  { name:"大都因帖睦尔", dynasty:"元", year:1348, province:"不详" },
+  { name:"王宗哲",   dynasty:"元", year:1351, province:"山东" },
+  { name:"唐兀",     dynasty:"元", year:1354, province:"不详" },
+
+  // ── 明 ──
+  { name:"吴伯宗",   dynasty:"明", year:1371, province:"江西" },
+  { name:"丁显",     dynasty:"明", year:1373, province:"福建" },
+  { name:"吴鼎",     dynasty:"明", year:1376, province:"浙江" },
+  { name:"任亨泰",   dynasty:"明", year:1385, province:"湖北" },
+  { name:"许观",     dynasty:"明", year:1385, province:"浙江" },
+  { name:"花纶",     dynasty:"明", year:1385, province:"浙江" },
+  { name:"练子宁",   dynasty:"明", year:1385, province:"江西" },
+  { name:"胡广",     dynasty:"明", year:1400, province:"江西" },
+  { name:"王艮",     dynasty:"明", year:1400, province:"江苏" },
+  { name:"林环",     dynasty:"明", year:1400, province:"福建" },
+  { name:"曾棨",     dynasty:"明", year:1404, province:"江西" },
+  { name:"陈循",     dynasty:"明", year:1404, province:"江西" },
+  { name:"周述",     dynasty:"明", year:1404, province:"江西" },
+  { name:"邹缉",     dynasty:"明", year:1404, province:"湖南" },
+  { name:"林桥",     dynasty:"明", year:1407, province:"福建" },
+  { name:"萧时中",   dynasty:"明", year:1407, province:"湖南" },
+  { name:"马铎",     dynasty:"明", year:1408, province:"福建" },
+  { name:"林志",     dynasty:"明", year:1411, province:"福建" },
+  { name:"陈全",     dynasty:"明", year:1411, province:"广东" },
+  { name:"梁褧",     dynasty:"明", year:1415, province:"广东" },
+  { name:"李骐",     dynasty:"明", year:1415, province:"福建" },
+  { name:"陈贯",     dynasty:"明", year:1415, province:"浙江" },
+  { name:"郭翀",     dynasty:"明", year:1418, province:"河北" },
+  { name:"曾鹤龄",   dynasty:"明", year:1421, province:"江西" },
+  { name:"洪英",     dynasty:"明", year:1421, province:"浙江" },
+  { name:"邢宽",     dynasty:"明", year:1424, province:"山西" },
+  { name:"林震",     dynasty:"明", year:1427, province:"福建" },
+  { name:"曹鼐",     dynasty:"明", year:1427, province:"河北" },
+  { name:"赵居任",   dynasty:"明", year:1430, province:"浙江" },
+  { name:"刘铉",     dynasty:"明", year:1433, province:"浙江" },
+  { name:"施槃",     dynasty:"明", year:1436, province:"浙江" },
+  { name:"周旋",     dynasty:"明", year:1439, province:"浙江" },
+  { name:"陈谨",     dynasty:"明", year:1442, province:"福建" },
+  { name:"商辂",     dynasty:"明", year:1450, province:"浙江" },
+  { name:"柯潜",     dynasty:"明", year:1454, province:"福建" },
+  { name:"彭教",     dynasty:"明", year:1457, province:"江西" },
+  { name:"罗伦",     dynasty:"明", year:1463, province:"江西" },
+  { name:"张升",     dynasty:"明", year:1466, province:"江西" },
+  { name:"丁溥",     dynasty:"明", year:1469, province:"浙江" },
+  { name:"吴宽",     dynasty:"明", year:1472, province:"江苏" },
+  { name:"谢迁",     dynasty:"明", year:1472, province:"浙江" },
+  { name:"王鏊",     dynasty:"明", year:1475, province:"江苏" },
+  { name:"李旻",     dynasty:"明", year:1478, province:"浙江" },
+  { name:"王华",     dynasty:"明", year:1481, province:"浙江" },
+  { name:"费宏",     dynasty:"明", year:1487, province:"江西" },
+  { name:"钱福",     dynasty:"明", year:1490, province:"江苏" },
+  { name:"毛澄",     dynasty:"明", year:1496, province:"江苏" },
+  { name:"伦文叙",   dynasty:"明", year:1505, province:"广东" },
+  { name:"朱希周",   dynasty:"明", year:1505, province:"江苏" },
+  { name:"鲁铎",     dynasty:"明", year:1508, province:"湖北" },
+  { name:"杨慎",     dynasty:"明", year:1511, province:"四川" },
+  { name:"唐皋",     dynasty:"明", year:1514, province:"安徽" },
+  { name:"孙承恩",   dynasty:"明", year:1517, province:"江苏" },
+  { name:"储珊",     dynasty:"明", year:1520, province:"浙江" },
+  { name:"龚用卿",   dynasty:"明", year:1532, province:"福建" },
+  { name:"林大钦",   dynasty:"明", year:1532, province:"广东" },
+  { name:"韩应龙",   dynasty:"明", year:1535, province:"浙江" },
+  { name:"沈坤",     dynasty:"明", year:1547, province:"江苏" },
+  { name:"李春芳",   dynasty:"明", year:1547, province:"江苏" },
+  { name:"秦鸣雷",   dynasty:"明", year:1550, province:"浙江" },
+  { name:"唐汝辑",   dynasty:"明", year:1553, province:"浙江" },
+  { name:"诸大绶",   dynasty:"明", year:1556, province:"浙江" },
+  { name:"申时行",   dynasty:"明", year:1562, province:"江苏" },
+  { name:"陶大临",   dynasty:"明", year:1565, province:"浙江" },
+  { name:"丁士美",   dynasty:"明", year:1565, province:"江苏" },
+  { name:"罗万化",   dynasty:"明", year:1568, province:"浙江" },
+  { name:"张元忭",   dynasty:"明", year:1571, province:"浙江" },
+  { name:"沈懋学",   dynasty:"明", year:1574, province:"安徽" },
+  { name:"孙继皋",   dynasty:"明", year:1577, province:"江苏" },
+  { name:"翁正春",   dynasty:"明", year:1592, province:"福建" },
+  { name:"朱国祚",   dynasty:"明", year:1589, province:"浙江" },
+  { name:"焦竑",     dynasty:"明", year:1589, province:"江苏" },
+  { name:"赵秉忠",   dynasty:"明", year:1598, province:"山东" },
+  { name:"张以诚",   dynasty:"明", year:1601, province:"浙江" },
+  { name:"杨守勤",   dynasty:"明", year:1604, province:"浙江" },
+  { name:"黄士俊",   dynasty:"明", year:1607, province:"广东" },
+  { name:"韩敬",     dynasty:"明", year:1610, province:"浙江" },
+  { name:"周延儒",   dynasty:"明", year:1613, province:"江苏" },
+  { name:"钱士升",   dynasty:"明", year:1613, province:"浙江" },
+  { name:"章孔教",   dynasty:"明", year:1616, province:"浙江" },
+  { name:"庄际昌",   dynasty:"明", year:1619, province:"福建" },
+  { name:"文震孟",   dynasty:"明", year:1622, province:"江苏" },
+  { name:"余煌",     dynasty:"明", year:1625, province:"浙江" },
+  { name:"刘若宰",   dynasty:"明", year:1628, province:"安徽" },
+  { name:"陈于泰",   dynasty:"明", year:1631, province:"江苏" },
+  { name:"刘同升",   dynasty:"明", year:1634, province:"江西" },
+  { name:"刘理顺",   dynasty:"明", year:1637, province:"河南" },
+  { name:"魏藻德",   dynasty:"明", year:1640, province:"北京" },
+  { name:"陈名夏",   dynasty:"明", year:1640, province:"江苏" },
+  { name:"杨廷鉴",   dynasty:"明", year:1643, province:"江苏" },
+
+  // ── 清 ──
+  { name:"傅以渐",   dynasty:"清", year:1646, province:"山东" },
+  { name:"吕宫",     dynasty:"清", year:1647, province:"江苏" },
+  { name:"刘子壮",   dynasty:"清", year:1646, province:"湖北" },
+  { name:"麻勒吉",   dynasty:"清", year:1646, province:"不详" },
+  { name:"史大成",   dynasty:"清", year:1649, province:"浙江" },
+  { name:"邹忠倚",   dynasty:"清", year:1652, province:"江苏" },
+  { name:"马世俊",   dynasty:"清", year:1652, province:"江苏" },
+  { name:"黄机",     dynasty:"清", year:1655, province:"浙江" },
+  { name:"严我斯",   dynasty:"清", year:1658, province:"浙江" },
+  { name:"徐元文",   dynasty:"清", year:1659, province:"江苏" },
+  { name:"缪彤",     dynasty:"清", year:1661, province:"江苏" },
+  { name:"邓中岳",   dynasty:"清", year:1664, province:"山东" },
+  { name:"张贞生",   dynasty:"清", year:1667, province:"江西" },
+  { name:"蔡启僔",   dynasty:"清", year:1670, province:"浙江" },
+  { name:"韩菼",     dynasty:"清", year:1673, province:"江苏" },
+  { name:"彭定求",   dynasty:"清", year:1676, province:"江苏" },
+  { name:"归允肃",   dynasty:"清", year:1679, province:"江苏" },
+  { name:"蔡升元",   dynasty:"清", year:1685, province:"浙江" },
+  { name:"陆肯堂",   dynasty:"清", year:1685, province:"江苏" },
+  { name:"陈敬",     dynasty:"清", year:1685, province:"山西" },
+  { name:"戴有祺",   dynasty:"清", year:1688, province:"江苏" },
+  { name:"胡任舆",   dynasty:"清", year:1688, province:"江苏" },
+  { name:"卢楞伽",   dynasty:"清", year:1688, province:"广东" },
+  { name:"李蟠",     dynasty:"清", year:1697, province:"江苏" },
+  { name:"汪绎",     dynasty:"清", year:1700, province:"江苏" },
+  { name:"王式丹",   dynasty:"清", year:1700, province:"江苏" },
+  { name:"王世琛",   dynasty:"清", year:1703, province:"江苏" },
+  { name:"赵熊诏",   dynasty:"清", year:1703, province:"江苏" },
+  { name:"缪沅",     dynasty:"清", year:1706, province:"江苏" },
+  { name:"王敬铭",   dynasty:"清", year:1709, province:"江苏" },
+  { name:"赵晋",     dynasty:"清", year:1712, province:"江苏" },
+  { name:"王云锦",   dynasty:"清", year:1715, province:"江苏" },
+  { name:"徐陶璋",   dynasty:"清", year:1718, province:"江苏" },
+  { name:"邓钟岳",   dynasty:"清", year:1721, province:"山东" },
+  { name:"于振",     dynasty:"清", year:1724, province:"江苏" },
+  { name:"陈德华",   dynasty:"清", year:1727, province:"河北" },
+  { name:"彭启丰",   dynasty:"清", year:1727, province:"江苏" },
+  { name:"周澍",     dynasty:"清", year:1730, province:"浙江" },
+  { name:"徐本",     dynasty:"清", year:1733, province:"浙江" },
+  { name:"金德瑛",   dynasty:"清", year:1736, province:"浙江" },
+  { name:"于敏中",   dynasty:"清", year:1745, province:"江苏" },
+  { name:"钱维城",   dynasty:"清", year:1745, province:"江苏" },
+  { name:"庄有恭",   dynasty:"清", year:1748, province:"广东" },
+  { name:"沈初",     dynasty:"清", year:1748, province:"浙江" },
+  { name:"秦大士",   dynasty:"清", year:1751, province:"江苏" },
+  { name:"庄培因",   dynasty:"清", year:1754, province:"江苏" },
+  { name:"梁国治",   dynasty:"清", year:1754, province:"浙江" },
+  { name:"蔡以台",   dynasty:"清", year:1757, province:"浙江" },
+  { name:"庄存与",   dynasty:"清", year:1757, province:"江苏" },
+  { name:"毕沅",     dynasty:"清", year:1760, province:"江苏" },
+  { name:"王杰",     dynasty:"清", year:1760, province:"陕西" },
+  { name:"秦大成",   dynasty:"清", year:1763, province:"江苏" },
+  { name:"张书勋",   dynasty:"清", year:1766, province:"江苏" },
+  { name:"陈初哲",   dynasty:"清", year:1769, province:"江苏" },
+  { name:"钱棨",     dynasty:"清", year:1778, province:"江苏" },
+  { name:"吴锡龄",   dynasty:"清", year:1772, province:"安徽" },
+  { name:"金榜",     dynasty:"清", year:1771, province:"安徽" },
+  { name:"茹棻",     dynasty:"清", year:1784, province:"浙江" },
+  { name:"史致光",   dynasty:"清", year:1784, province:"浙江" },
+  { name:"汪如洋",   dynasty:"清", year:1787, province:"浙江" },
+  { name:"石韫玉",   dynasty:"清", year:1790, province:"江苏" },
+  { name:"胡长龄",   dynasty:"清", year:1790, province:"江苏" },
+  { name:"潘世恩",   dynasty:"清", year:1793, province:"江苏" },
+  { name:"赵文楷",   dynasty:"清", year:1796, province:"安徽" },
+  { name:"姚文田",   dynasty:"清", year:1799, province:"浙江" },
+  { name:"顾皋",     dynasty:"清", year:1799, province:"江苏" },
+  { name:"吴廷琛",   dynasty:"清", year:1802, province:"江苏" },
+  { name:"彭浚",     dynasty:"清", year:1802, province:"湖南" },
+  { name:"吴信中",   dynasty:"清", year:1805, province:"江苏" },
+  { name:"蒋立镛",   dynasty:"清", year:1808, province:"湖北" },
+  { name:"龙汝言",   dynasty:"清", year:1809, province:"安徽" },
+  { name:"陈鋆",     dynasty:"清", year:1811, province:"浙江" },
+  { name:"蒋元溥",   dynasty:"清", year:1814, province:"浙江" },
+  { name:"吴其浚",   dynasty:"清", year:1817, province:"河南" },
+  { name:"陈大汶",   dynasty:"清", year:1820, province:"浙江" },
+  { name:"钮福保",   dynasty:"清", year:1823, province:"江苏" },
+  { name:"林召棠",   dynasty:"清", year:1823, province:"广东" },
+  { name:"朱昌颐",   dynasty:"清", year:1826, province:"浙江" },
+  { name:"戴兰芬",   dynasty:"清", year:1826, province:"安徽" },
+  { name:"吴钟骏",   dynasty:"清", year:1832, province:"江苏" },
+  { name:"刘绎",     dynasty:"清", year:1832, province:"江西" },
+  { name:"钟骏声",   dynasty:"清", year:1835, province:"浙江" },
+  { name:"林鸿年",   dynasty:"清", year:1835, province:"福建" },
+  { name:"李承霖",   dynasty:"清", year:1838, province:"江苏" },
+  { name:"张启恩",   dynasty:"清", year:1838, province:"山东" },
+  { name:"胡家玉",   dynasty:"清", year:1841, province:"江西" },
+  { name:"潘祖荫",   dynasty:"清", year:1844, province:"江苏" },
+  { name:"萧锦忠",   dynasty:"清", year:1844, province:"湖南" },
+  { name:"苑广文",   dynasty:"清", year:1847, province:"山东" },
+  { name:"张之万",   dynasty:"清", year:1847, province:"河北" },
+  { name:"陆增祥",   dynasty:"清", year:1850, province:"江苏" },
+  { name:"孙如仅",   dynasty:"清", year:1853, province:"山东" },
+  { name:"孙家鼐",   dynasty:"清", year:1856, province:"安徽" },
+  { name:"翁同龢",   dynasty:"清", year:1856, province:"江苏" },
+  { name:"翁曾源",   dynasty:"清", year:1859, province:"江苏" },
+  { name:"章鋆",     dynasty:"清", year:1859, province:"浙江" },
+  { name:"徐郙",     dynasty:"清", year:1865, province:"江苏" },
+  { name:"洪钧",     dynasty:"清", year:1868, province:"江苏" },
+  { name:"梁耀枢",   dynasty:"清", year:1868, province:"广东" },
+  { name:"梅启照",   dynasty:"清", year:1871, province:"安徽" },
+  { name:"陆润庠",   dynasty:"清", year:1874, province:"江苏" },
+  { name:"曹鸿勋",   dynasty:"清", year:1877, province:"山东" },
+  { name:"王仁堪",   dynasty:"清", year:1877, province:"福建" },
+  { name:"黄思永",   dynasty:"清", year:1880, province:"江苏" },
+  { name:"黎培敬",   dynasty:"清", year:1880, province:"湖南" },
+  { name:"陈冕",     dynasty:"清", year:1880, province:"浙江" },
+  { name:"崔国因",   dynasty:"清", year:1880, province:"安徽" },
+  { name:"于式枚",   dynasty:"清", year:1880, province:"广西" },
+  { name:"赵以炯",   dynasty:"清", year:1886, province:"贵州" },
+  { name:"吴鲁",     dynasty:"清", year:1886, province:"福建" },
+  { name:"张建勋",   dynasty:"清", year:1889, province:"广西" },
+  { name:"李盛铎",   dynasty:"清", year:1889, province:"江西" },
+  { name:"刘福姚",   dynasty:"清", year:1892, province:"广西" },
+  { name:"张謇",     dynasty:"清", year:1894, province:"江苏" },
+  { name:"骆成骧",   dynasty:"清", year:1895, province:"四川" },
+  { name:"夏同龢",   dynasty:"清", year:1898, province:"贵州" },
+  { name:"王寿彭",   dynasty:"清", year:1903, province:"山东" },
+  { name:"刘春霖",   dynasty:"清", year:1904, province:"河北" },
+];
+
+// 自动去重（同名 + 同朝代 + 同年份 → 保留第一条）
+const ZHUANGYUAN_DATA = _RAW.filter((r, i, arr) =>
+  arr.findIndex(x => x.name === r.name && x.dynasty === r.dynasty && x.year === r.year) === i
+);
+
+// ─────────────────────────────────────────
+//  朝代配置
+// ─────────────────────────────────────────
+const DYNASTIES = [
+  { key:"隋",     label:"隋",   color:"#6d8fce" },
+  { key:"唐",     label:"唐",   color:"#e67e22" },
+  { key:"五代十国",label:"五代", color:"#9b59b6" },
+  { key:"北宋",   label:"北宋", color:"#27ae60" },
+  { key:"南宋",   label:"南宋", color:"#17a059" },
+  { key:"辽",     label:"辽",   color:"#16a085" },
+  { key:"金",     label:"金",   color:"#e8b210" },
+  { key:"元",     label:"元",   color:"#8e44ad" },
+  { key:"明",     label:"明",   color:"#2980b9" },
+  { key:"清",     label:"清",   color:"#c0392b" },
+];
+
+// ─────────────────────────────────────────
+//  省名映射（数据短名 ↔ GeoJSON 全称）
+// ─────────────────────────────────────────
+const PROVINCE_FULL = {
+  "北京":"北京市","天津":"天津市","上海":"上海市","重庆":"重庆市",
+  "河北":"河北省","山西":"山西省","辽宁":"辽宁省","吉林":"吉林省",
+  "黑龙江":"黑龙江省","江苏":"江苏省","浙江":"浙江省","安徽":"安徽省",
+  "福建":"福建省","江西":"江西省","山东":"山东省","河南":"河南省",
+  "湖北":"湖北省","湖南":"湖南省","广东":"广东省","海南":"海南省",
+  "四川":"四川省","贵州":"贵州省","云南":"云南省","陕西":"陕西省",
+  "甘肃":"甘肃省","青海":"青海省","内蒙古":"内蒙古自治区",
+  "广西":"广西壮族自治区","西藏":"西藏自治区","宁夏":"宁夏回族自治区",
+  "新疆":"新疆维吾尔自治区","台湾":"台湾省","香港":"香港特别行政区","澳门":"澳门特别行政区",
+};
+const PROVINCE_SHORT = Object.fromEntries(Object.entries(PROVINCE_FULL).map(([k,v])=>[v,k]));
+
+// ─────────────────────────────────────────
+//  状态
+// ─────────────────────────────────────────
+let selectedDynasties = new Set(DYNASTIES.map(d => d.key));
+let selectedProvince = null;
+let chart = null;
+
+// ─────────────────────────────────────────
+//  筛选器
+// ─────────────────────────────────────────
+function initFilter() {
+  const container = document.getElementById("dynasty-filter");
+  DYNASTIES.forEach(d => {
+    const btn = document.createElement("button");
+    btn.className = "dynasty-btn active";
+    btn.textContent = d.label;
+    btn.dataset.key = d.key;
+    btn.addEventListener("click", () => toggleDynasty(d.key, btn));
+    container.appendChild(btn);
+  });
+}
+
+function toggleDynasty(key, btn) {
+  if (selectedDynasties.has(key)) { selectedDynasties.delete(key); btn.classList.remove("active"); }
+  else { selectedDynasties.add(key); btn.classList.add("active"); }
+  updateView();
+}
+
+function selectAll() {
+  selectedDynasties = new Set(DYNASTIES.map(d => d.key));
+  document.querySelectorAll(".dynasty-btn").forEach(b => b.classList.add("active"));
+  updateView();
+}
+
+function clearAll() {
+  selectedDynasties.clear();
+  document.querySelectorAll(".dynasty-btn").forEach(b => b.classList.remove("active"));
+  updateView();
+}
+
+// ─────────────────────────────────────────
+//  数据聚合
+// ─────────────────────────────────────────
+function aggregateByProvince() {
+  const filtered = ZHUANGYUAN_DATA.filter(r =>
+    selectedDynasties.has(r.dynasty) && r.province !== "不详"
+  );
+  const map = {};
+  filtered.forEach(r => {
+    if (!map[r.province]) map[r.province] = { province:r.province, count:0, dynastyCount:{}, persons:[] };
+    map[r.province].count++;
+    map[r.province].dynastyCount[r.dynasty] = (map[r.province].dynastyCount[r.dynasty]||0)+1;
+    map[r.province].persons.push(r);
+  });
+  const rows = Object.values(map).sort((a,b) => b.count - a.count);
+  rows.forEach(r => {
+    r.topDynasty = Object.entries(r.dynastyCount).sort((a,b)=>b[1]-a[1])[0]?.[0] || "";
+  });
+  return rows;
+}
+
+// ─────────────────────────────────────────
+//  主更新
+// ─────────────────────────────────────────
+function updateView() {
+  const rows = aggregateByProvince();
+  const total = ZHUANGYUAN_DATA.filter(r => selectedDynasties.has(r.dynasty)).length;
+  document.getElementById("stat-total").textContent = total;
+  document.getElementById("stat-provinces").textContent = rows.length;
+  updateMap(rows);
+  updateList(rows);
+}
+
+// ─────────────────────────────────────────
+//  地图
+// ─────────────────────────────────────────
+function initChart(geoJson) {
+  echarts.registerMap("china", geoJson);
+  chart = echarts.init(document.getElementById("map"), null, { renderer:"canvas" });
+  chart.on("click", params => {
+    if (params.componentType === "series") {
+      const shortName = PROVINCE_SHORT[params.name] || params.name;
+      highlightProvince(shortName);
+    }
+  });
+  window.addEventListener("resize", () => chart.resize());
+  updateView();
+}
+
+function updateMap(rows) {
+  if (!chart) return;
+  const maxCount = rows[0]?.count || 1;
+  const dataMap = {};
+  rows.forEach(r => { dataMap[r.province] = r.count; });
+
+  chart.setOption({
+    backgroundColor: "#f5f0e8",
+    tooltip: {
+      trigger: "item",
+      formatter: params => {
+        const shortName = PROVINCE_SHORT[params.name] || params.name;
+        const count = dataMap[shortName] || 0;
+        if (!count) return `<b>${shortName}</b><br/>暂无记录`;
+        const row = rows.find(r => r.province === shortName);
+        const breakdown = Object.entries(row?.dynastyCount||{})
+          .sort((a,b)=>b[1]-a[1]).map(([d,c])=>`${d} ${c}人`).join("　");
+        return `<b>${shortName}</b><br/>状元共 <b>${count}</b> 位<br/><span style="color:#aaa;font-size:12px">${breakdown}</span>`;
+      }
+    },
+    visualMap: {
+      min:0, max:maxCount,
+      text:["多","少"],
+      calculable:false,
+      inRange:{ color:["#fae8e0","#e8a090","#c0392b"] },
+      textStyle:{ color:"#666", fontSize:11 },
+      bottom:20, left:16, itemWidth:12, itemHeight:70,
+    },
+    series:[{
+      type:"map", map:"china", roam:true,
+      scaleLimit:{ min:0.8, max:4 },
+      label:{ show:false },
+      emphasis:{ label:{ show:true, color:"#2c1a0e", fontSize:12 }, itemStyle:{ areaColor:"#f5b78e" } },
+      select:{
+        label:{ show:true, color:"#2c1a0e", fontSize:12, fontWeight:"bold" },
+        itemStyle:{ areaColor:"#f5b78e", borderColor:"#c0392b", borderWidth:2 }
+      },
+      selectedMode:"single",
+      // 用 GeoJSON 全称作为 name，value 来自短名映射
+      data: Object.entries(dataMap).map(([short,value])=>({
+        name: PROVINCE_FULL[short] || short, value
+      })),
+    }],
+  });
+}
+
+// ─────────────────────────────────────────
+//  排行列表
+// ─────────────────────────────────────────
+function updateList(rows) {
+  const list = document.getElementById("ranking-list");
+  const empty = document.getElementById("empty-state");
+  if (!rows.length) { list.innerHTML=""; empty.style.display="block"; return; }
+  empty.style.display = "none";
+
+  list.innerHTML = rows.map((r,i) => {
+    const isSelected = selectedProvince === r.province;
+    // 按朝代分组展示状元
+    const byDynasty = {};
+    r.persons.forEach(p => {
+      (byDynasty[p.dynasty] = byDynasty[p.dynasty]||[]).push(p);
+    });
+    const dynastyOrder = DYNASTIES.map(d=>d.key).filter(k=>byDynasty[k]);
+    const detailHTML = dynastyOrder.map(d => `
+      <div class="dynasty-section">
+        <div class="dynasty-label">${d}（${byDynasty[d].length}人）</div>
+        <div class="person-list">
+          ${byDynasty[d].sort((a,b)=>(a.year||0)-(b.year||0)).map(p=>`
+            <div class="person-tag${p.uncertain?' uncertain':''}" title="${p.uncertain?'存疑记录':''}">
+              ${p.name}<span>${p.year||'?'}年</span>
+            </div>`).join("")}
+        </div>
+      </div>`).join("");
+
+    return `
+      <div class="rank-row${isSelected?' selected':''}" data-province="${r.province}" onclick="handleRowClick('${r.province}')">
+        <div class="rank-num">${i+1}</div>
+        <div class="rank-province">${r.province}</div>
+        <div class="rank-count">${r.count}</div>
+        <div class="rank-top-dynasty">${r.topDynasty}最多</div>
+      </div>
+      <div class="rank-detail${isSelected?' open':''}" id="detail-${r.province}">
+        <div class="rank-detail-title">${r.province} · 历代状元 ${r.count} 人</div>
+        ${detailHTML}
+      </div>`;
+  }).join("");
+}
+
+// ─────────────────────────────────────────
+//  联动
+// ─────────────────────────────────────────
+function handleRowClick(province) {
+  const wasSelected = selectedProvince === province;
+  if (selectedProvince && chart) chart.dispatchAction({type:"unselect",seriesIndex:0,name:PROVINCE_FULL[selectedProvince]||selectedProvince});
+  selectedProvince = wasSelected ? null : province;
+  if (selectedProvince && chart) chart.dispatchAction({type:"select",seriesIndex:0,name:PROVINCE_FULL[selectedProvince]||selectedProvince});
+  updateList(aggregateByProvince());
+}
+
+function highlightProvince(province) {
+  selectedProvince = selectedProvince === province ? null : province;
+  updateList(aggregateByProvince());
+  setTimeout(() => {
+    const el = document.querySelector(`[data-province="${province}"]`);
+    if (el) el.scrollIntoView({ behavior:"smooth", block:"nearest" });
+  }, 50);
+}
+
+// ─────────────────────────────────────────
+//  启动
+// ─────────────────────────────────────────
+initFilter();
+
+fetch("https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json")
+  .then(r => r.json())
+  .then(geoJson => initChart(geoJson))
+  .catch(() => {
+    document.getElementById("map").innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999;font-size:14px;">' +
+      '地图加载失败，请检查网络后刷新。</div>';
+    updateView();
+  });
+</script>
+</body>
+</html>
