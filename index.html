@@ -935,7 +935,7 @@ function highlightProvince(province) {
 // ─────────────────────────────────────────
 initFilter();
 
-fetch("https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json")
+fetch("china_geo.json")
   .then(r => r.json())
   .then(geoJson => initChart(geoJson))
   .catch(() => {
